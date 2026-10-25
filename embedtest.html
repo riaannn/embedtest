@@ -1,0 +1,146 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Embed launcher</title>
+<style>
+  :root{--bg:#0e0f14;--card:#171923;--line:#262a38;--fg:#e8eaf2;--dim:#8b90a3;--acc:#8b5cf6}
+  *{box-sizing:border-box}
+  body{margin:0;min-height:100vh;display:flex;align-items:center;justify-content:center;background:var(--bg);color:var(--fg);font:15px/1.45 system-ui,sans-serif}
+  main{width:min(520px,92vw);padding:24px 0}
+  h1{font-size:20px;margin:0 0 4px}
+  .url{margin:0 0 18px;color:var(--dim);font-size:12px;word-break:break-all}
+  .row{display:flex;gap:8px;margin-bottom:8px}
+  button{flex:1;text-align:left;padding:12px 14px;border:1px solid var(--line);border-radius:10px;background:var(--card);color:var(--fg);cursor:pointer;font:inherit}
+  button:hover{border-color:var(--acc)}
+  button b{display:block;font-weight:600}
+  button span{color:var(--dim);font-size:12.5px}
+  input{width:110px;padding:0 10px;border:1px solid var(--line);border-radius:10px;background:var(--card);color:var(--fg);font:inherit}
+  #s{min-height:22px;margin:14px 0 0;color:var(--dim);font-size:13px}
+  #s.err{color:#f87171}
+  .copy{margin-top:6px;padding:6px 10px;flex:none;font-size:12.5px}
+</style>
+</head>
+<body>
+<main>
+  <h1>Embed launcher</h1>
+  <p class="url" id="u"></p>
+
+  <div class="row"><button data-m="srcdoc"><b>about:srcdoc</b><span>New tab holding an iframe whose srcdoc embeds the link</span></button></div>
+  <div class="row"><button data-m="js"><b>javascript: tab</b><span>Opens a tab via a javascript: URL that builds the embed</span></button></div>
+  <div class="row">
+    <button data-m="hash"><b>about:blank#…</b><span>Blank tab with a fragment, link embedded in it</span></button>
+    <input id="h" value="anything" aria-label="Fragment">
+  </div>
+  <div class="row">
+    <button data-m="query"><b>about:blank?…</b><span>Blank tab with a query string, link embedded in it</span></button>
+    <input id="q" value="x" aria-label="Query">
+  </div>
+  <div class="row"><button data-m="pip"><b>Document Picture-in-Picture</b><span>Floating always-on-top window (Chromium only)</span></button></div>
+
+  <p id="s"></p>
+  <button class="copy" id="copy" type="button">Copy javascript: code</button>
+</main>
+
+<script>
+(function () {
+  var LINK = 'https://esm.sh/gh/riaannn/novvlauncher@44a9ad8/thingylauncher.html';
+  var ALLOW = 'fullscreen; autoplay; clipboard-read; clipboard-write; gamepad; microphone; camera; midi; encrypted-media; display-capture';
+  var TITLE = 'Launcher';
+  var FRAME_CSS = 'position:fixed;inset:0;width:100%;height:100%;border:0;background:#000';
+
+  var status = document.getElementById('s');
+  document.getElementById('u').textContent = LINK;
+
+  function say(msg, bad) { status.textContent = msg; status.className = bad ? 'err' : ''; }
+
+  function mountLink(doc) {
+    if (!doc.body) doc.documentElement.appendChild(doc.createElement('body'));
+    doc.title = TITLE;
+    doc.body.style.cssText = 'margin:0;background:#000';
+    var f = doc.createElement('iframe');
+    f.src = LINK;
+    f.allow = ALLOW;
+    f.allowFullscreen = true;
+    f.style.cssText = FRAME_CSS;
+    doc.body.appendChild(f);
+  }
+
+  function openBlank(url) {
+    var w = window.open(url);
+    if (!w) throw new Error('Popup blocked. Allow popups for this page and try again.');
+    return w;
+  }
+
+  function shellHtml() {
+    return '<!doctype html><html><head><meta charset="utf-8"><title>' + TITLE + '</title>' +
+      '<style>html,body{margin:0;height:100%;background:#000}iframe{position:absolute;inset:0;width:100%;height:100%;border:0}</style></head>' +
+      '<body><iframe src="' + LINK + '" allow="' + ALLOW + '" allowfullscreen></iframe></body></html>';
+  }
+
+  function jsCode() {
+    return "document.title=" + JSON.stringify(TITLE) + ";var b=document.body;b.style.cssText='margin:0;background:#000';" +
+      "var f=document.createElement('iframe');f.src=" + JSON.stringify(LINK) + ";f.allow=" + JSON.stringify(ALLOW) + ";" +
+      "f.allowFullscreen=true;f.style.cssText=" + JSON.stringify(FRAME_CSS) + ";b.appendChild(f);void 0";
+  }
+
+  var methods = {
+    srcdoc: function () {
+      var w = openBlank('about:blank');
+      var d = w.document;
+      if (!d.body) d.documentElement.appendChild(d.createElement('body'));
+      d.title = TITLE;
+      d.body.style.cssText = 'margin:0;background:#000';
+      var f = d.createElement('iframe');
+      f.setAttribute('srcdoc', shellHtml());
+      f.allow = ALLOW;
+      f.allowFullscreen = true;
+      f.style.cssText = FRAME_CSS;
+      d.body.appendChild(f);
+      return 'Opened an about:blank tab holding an about:srcdoc iframe.';
+    },
+    js: function () {
+      openBlank('javascript:' + encodeURIComponent(jsCode()));
+      return 'Opened via a javascript: URL. If the tab stays blank, your browser or a filter blocked it: use "Copy javascript: code" and run it in a blank tab\u2019s console.';
+    },
+    hash: function () {
+      var v = document.getElementById('h').value.trim() || 'anything';
+      var w = openBlank('about:blank#' + encodeURIComponent(v));
+      mountLink(w.document);
+      return 'Opened about:blank#' + v + '.';
+    },
+    query: function () {
+      var v = document.getElementById('q').value.trim() || 'x';
+      var w = openBlank('about:blank?' + encodeURIComponent(v));
+      mountLink(w.document);
+      return 'Opened about:blank?' + v + '.';
+    },
+    pip: function () {
+      if (!('documentPictureInPicture' in window)) throw new Error('Document Picture-in-Picture isn\u2019t supported in this browser (needs Chrome/Edge 116+).');
+      return window.documentPictureInPicture.requestWindow({ width: 640, height: 400 }).then(function (pip) {
+        mountLink(pip.document);
+        return 'Opened a Picture-in-Picture window.';
+      });
+    }
+  };
+
+  document.querySelectorAll('button[data-m]').forEach(function (btn) {
+    btn.addEventListener('click', function () {
+      try {
+        Promise.resolve(methods[btn.dataset.m]()).then(function (m) { say(m); }, function (e) { say(e.message, true); });
+      } catch (e) { say(e.message, true); }
+    });
+  });
+
+  document.getElementById('copy').addEventListener('click', function () {
+    var code = jsCode();
+    (navigator.clipboard ? navigator.clipboard.writeText(code) : Promise.reject()).then(
+      function () { say('Copied. Paste it into the console of a blank tab.'); },
+      function () { window.prompt('Copy this code:', code); }
+    );
+  });
+})();
+</script>
+</body>
+</html>
